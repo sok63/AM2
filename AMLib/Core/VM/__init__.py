@@ -30,6 +30,11 @@ class VM:
   Virtual machine for commands execution.
   Used to 'play' selected gene.
   """
+  __slots__ = [
+    'params', 'gene', 'samples', 'registers', 'heap',
+    'stack', 'command_counter', 'command_pointer',
+    'registers_usage', 'inputs', 'outputs', 'scores'
+  ]
 
   def __init__(self, params: VMParams, gene: List = None):
     self.params = params

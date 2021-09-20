@@ -3,10 +3,10 @@ from typing import List
 
 class VMScorer:
   """
-  Calculate score for VM
+  Calculate score for VM.
   """
   @staticmethod
-  def calc(vm) -> List[float]:
+  def calc(vm, sub_result: bool) -> List[float]:
     pass
 
 
@@ -14,15 +14,14 @@ class VMParams:
   """
   Contains core VM settings.
   """
-  def __init__(self, tickScorers: List[VMScorer], totalScorers: List[VMScorer]):
+  def __init__(self, scorers: List[VMScorer]):
     self.register_count = 4
     self.heap_size = 10
     self.stackLimit = 10
     self.tickLimit = 1000
     self.input_size = 0
     self.output_size = 0
-    self.tick_scorers = tickScorers
-    self.total_scorers = totalScorers
+    self.scorers = scorers
     self.exception_handlers = {}
 
 
@@ -105,8 +104,8 @@ class VM:
         self.params.exception_handlers[exc.args[0]](self)
 
     # Post calc
-    for scorer in self.params.tick_scorers:
-      scorer.calc(self)
+    for scorer in self.params.scorers:
+      scorer.calc(self, sub_result=True)
 
     # Return result
     return self.outputs
@@ -115,5 +114,5 @@ class VM:
     """ Calculate all samples setted in VM """
     for sample in self.samples:
       self.calcStep(sample)
-    for scorer in self.params.total_scorers:
-      self.scores[scorer.__str__] = scorer.calc(self)
+    for scorer in self.params.scorers:
+      self.scores[scorer.__str__] = scorer.calc(self, sub_result=False)

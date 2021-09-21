@@ -55,19 +55,19 @@ class VM:
 
     self.reset()
 
-  def setSamples(self, samples):
+  def setSamples(self, samples) -> None:
     """ Override samples data in VM """
     self.samples = samples
 
-  def setNewGene(self, gene):
+  def setNewGene(self, gene) -> None:
     """ Override gene data in VM """
     self.gene = gene
 
-  def resetScores(self):
+  def resetScores(self) -> None:
     """ Reset all scores for VM """
     self.scores = {}
 
-  def reset(self):
+  def reset(self) -> None:
     """ Reset state for next sample calculation """
     self.registers = [0. for _ in range(self.params.register_count)]
     self.registers_usage = [0. for _ in range(self.params.register_count)]
@@ -80,7 +80,7 @@ class VM:
     self.outputs = []
     self.step_complete = False
 
-  def calcStep(self, sample) -> List:
+  def calcStep(self, sample) -> bool:
     """
      Calculate one sample.
      Do reset() automatically before calculation process
@@ -120,11 +120,14 @@ class VM:
       scorer.calc(self, sub_result=True)
 
     # Return result
-    return self.outputs
+    return self.step_complete
 
-  def calcAll(self):
+  def calcAll(self) -> List[bool]:
     """ Calculate all samples setted in VM """
+    result = []
     for sample in self.samples:
-      self.calcStep(sample)
+      result.append(self.calcStep(sample))
     for scorer in self.params.scorers:
       self.scores[scorer.__str__] = scorer.calc(self, sub_result=False)
+
+    return result

@@ -33,7 +33,8 @@ class VM:
   __slots__ = [
     'params', 'gene', 'samples', 'registers', 'heap',
     'stack', 'command_counter', 'command_pointer',
-    'registers_usage', 'inputs', 'outputs', 'scores'
+    'registers_usage', 'inputs', 'outputs', 'scores',
+    'step_complete'
   ]
 
   def __init__(self, params: VMParams, gene: List = None):
@@ -50,6 +51,7 @@ class VM:
     self.registers_usage = None
     self.inputs = None
     self.outputs = None
+    self.step_complete = False
 
     self.reset()
 
@@ -76,6 +78,7 @@ class VM:
     self.command_pointer = 0
     self.inputs = []
     self.outputs = []
+    self.step_complete = False
 
   def calcStep(self, sample) -> List:
     """
@@ -108,6 +111,9 @@ class VM:
         raise exc
       else:
         self.params.exception_handlers[exc.args[0]](self)
+
+    else:
+      self.step_complete = True
 
     # Post calc
     for scorer in self.params.scorers:

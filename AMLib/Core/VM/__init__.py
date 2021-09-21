@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict
 
 
 class VMScorer:
@@ -6,7 +6,7 @@ class VMScorer:
   Calculate score for VM.
   """
   @staticmethod
-  def calc(vm, sub_result: bool) -> List[float]:
+  def calc(vm) -> float:
     pass
 
 
@@ -34,7 +34,7 @@ class VM:
     'params', 'gene', 'samples', 'registers', 'heap',
     'stack', 'command_counter', 'command_pointer',
     'registers_usage', 'inputs', 'outputs', 'scores',
-    'step_complete'
+    'step_complete', 'sample_idx'
   ]
 
   def __init__(self, params: VMParams, gene: List = None):
@@ -52,6 +52,7 @@ class VM:
     self.inputs = None
     self.outputs = None
     self.step_complete = False
+    self.sample_idx = None
 
     self.reset()
 
@@ -79,6 +80,7 @@ class VM:
     self.inputs = []
     self.outputs = []
     self.step_complete = False
+    self.sample_idx = 0
 
   def step(self, sample) -> bool:
     """
@@ -116,8 +118,8 @@ class VM:
       self.step_complete = True
 
     # Post calc
-    for scorer in self.params.scorers:
-      scorer.calc(self, sub_result=True)
+    for scorer in self.params.scorers["step"]:
+      self.scores[scorer.__str__] = scorer.calc(self)
 
     # Return result
     return self.step_complete
@@ -128,7 +130,7 @@ class VM:
     for sample in self.samples:
       result.append(self.step(sample))
 
-    for scorer in self.params.scorers:
-      self.scores[scorer.__str__] = scorer.calc(self, sub_result=False)
+    for scorer in self.params.scorers["result"]:
+      self.scores[scorer.__str__] = scorer.calc(self)
 
     return result

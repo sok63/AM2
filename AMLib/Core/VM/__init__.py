@@ -40,6 +40,7 @@ class VM:
     self.params = params
     self.gene = gene
     self.samples = []
+    self.scores = {}
 
     self.registers = None
     self.heap = None

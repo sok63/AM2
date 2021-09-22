@@ -1,4 +1,26 @@
-from typing import List, Dict
+from typing import List, Dict, Any
+
+
+class VMSample(List):
+  def __init__(self, input: List[float] = None, output: List[float] = None, other: Dict[str, Any] = None):
+    super().__init__([input, output, other])
+
+  def __getattribute__(self, item):
+    if item == "input":
+      return self[0]
+    elif item == "output":
+      return self[1]
+    elif item == "other":
+      return self[2]
+
+
+class VMDataset(List):
+  """
+  Describe compatible dataset format for VMs
+  """
+
+  def __init__(self, samples: List[VMSample]):
+    super().__init__(samples)
 
 
 class VMScorer:
@@ -9,19 +31,35 @@ class VMScorer:
   def calc(vm) -> float:
     pass
 
+  @staticmethod
+  def get_name() -> str:
+    """
+    Return name of scorer.
+    """
+    raise TypeError()
+
+  @staticmethod
+  def get_direction() -> bool:
+    """
+    Return direction of optimization, where:
+    False - negative is better
+    True - positive is better
+    """
+    raise TypeError()
+
 
 class VMParams:
   """
-  Contains core VM settings.
+  Contains constants VM settings.
   """
   def __init__(self, scorers: List[VMScorer]):
     self.register_count = 4
     self.heap_size = 10
     self.stackLimit = 10
     self.tickLimit = 1000
-    self.input_size = 0
-    self.output_size = 0
-    self.scorers = scorers
+    self.scorers = {"step": [], "result": []}
+    if scorers is not None:
+      self.scorers = scorers
     self.exception_handlers = {}
 
 
@@ -33,15 +71,17 @@ class VM:
   __slots__ = [
     'params', 'gene', 'samples', 'registers', 'heap',
     'stack', 'command_counter', 'command_pointer',
-    'registers_usage', 'inputs', 'outputs', 'scores',
-    'step_complete', 'sample_idx'
+    'registers_usage', 'sample', 'scores',
+    'step_complete', 'sample_idx', 'input_size'
   ]
 
-  def __init__(self, params: VMParams, gene: List = None):
+  def __init__(self, params: VMParams = VMParams(), gene: List = None):
     self.params = params
-    self.gene = gene
+    self.gene = []
+    if gene is not None:
+      self.gene = gene
+
     self.samples = []
-    self.scores = {}
 
     self.registers = None
     self.heap = None
@@ -49,12 +89,9 @@ class VM:
     self.command_counter = None
     self.command_pointer = None
     self.registers_usage = None
-    self.inputs = None
-    self.outputs = None
+    self.sample = None
     self.step_complete = False
     self.sample_idx = None
-
-    self.reset()
 
   def set_samples(self, samples) -> None:
     """ Override samples data in VM """
@@ -72,24 +109,20 @@ class VM:
     """ Reset state for next sample calculation """
     self.registers = [0. for _ in range(self.params.register_count)]
     self.registers_usage = [0. for _ in range(self.params.register_count)]
-    self.outputs = [None for _ in range(self.params.output_size)]
-    self.heap = [0. for _ in range(self.params.heap_size)]
+    self.heap = [0. for _ in range(max(self.params.heap_size, len(self.sample.output)))]
     self.stack = []
     self.command_counter = 0
     self.command_pointer = 0
-    self.inputs = []
-    self.outputs = []
     self.step_complete = False
     self.sample_idx = 0
 
   def step(self, sample) -> bool:
     """
      Calculate one sample.
-     Do reset() automatically before calculation process
     """
     # Prepare
+    self.sample = sample
     self.reset()
-    self.inputs = sample
 
     # Calc
     try:
@@ -127,7 +160,8 @@ class VM:
   def calc(self) -> List[bool]:
     """ Calculate all samples in VM """
     result = []
-    for sample in self.samples:
+    for idx, sample in enumerate(self.samples):
+      self.sample_idx = idx
       result.append(self.step(sample))
 
     for scorer in self.params.scorers["result"]:

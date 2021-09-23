@@ -1,66 +1,4 @@
-from typing import List, Dict, Any
-
-
-class VMSample(List):
-  def __init__(self, input: List[float] = None, output: List[float] = None, other: Dict[str, Any] = None):
-    super().__init__([input, output, other])
-
-  def __getattribute__(self, item):
-    if item == "input":
-      return self[0]
-    elif item == "output":
-      return self[1]
-    elif item == "other":
-      return self[2]
-
-
-class VMDataset(List):
-  """
-  Describe compatible dataset format for VMs
-  """
-
-  def __init__(self, samples: List[VMSample]):
-    super().__init__(samples)
-
-
-class VMScorer:
-  """
-  Calculate score for VM.
-  """
-  @staticmethod
-  def calc(vm) -> float:
-    pass
-
-  @staticmethod
-  def get_name() -> str:
-    """
-    Return name of scorer.
-    """
-    raise TypeError()
-
-  @staticmethod
-  def get_direction() -> bool:
-    """
-    Return direction of optimization, where:
-    False - negative is better
-    True - positive is better
-    """
-    raise TypeError()
-
-
-class VMParams:
-  """
-  Contains constants VM settings.
-  """
-  def __init__(self, scorers: List[VMScorer]):
-    self.register_count = 4
-    self.heap_size = 10
-    self.stackLimit = 10
-    self.tickLimit = 1000
-    self.scorers = {"step": [], "result": []}
-    if scorers is not None:
-      self.scorers = scorers
-    self.exception_handlers = {}
+from typing import List
 
 
 class VM:
@@ -69,25 +7,32 @@ class VM:
   Used to 'play' selected gene.
   """
   __slots__ = [
-    'params', 'gene', 'samples', 'registers', 'heap',
-    'stack', 'command_counter', 'command_pointer',
-    'registers_usage', 'sample', 'scores',
-    'step_complete', 'sample_idx', 'input_size'
+    'gene', 'samples', 'scorers', 'exception_handlers',  # External things
+    'stack', 'registers', 'heap',  # VM Hardware
+    'register_count', 'heap_size',  # VM Hardware params
+    'stackLimit', 'tickLimit',  # Limits
+    'pointer', 'counter', 'registers_usage',  # Counters
+    'sample', 'sample_idx',  # Actual sample
+    'step_complete'  # Flags
+
   ]
 
-  def __init__(self, params: VMParams = VMParams(), gene: List = None):
-    self.params = params
+  def __init__(self):
     self.gene = []
-    if gene is not None:
-      self.gene = gene
+    self.scorers = []
+    self.exception_handlers = {}
+    self.register_count = 4
+    self.heap_size = 10
+    self.stackLimit = 10
+    self.tickLimit = 1000
 
     self.samples = []
 
     self.registers = None
     self.heap = None
     self.stack = None
-    self.command_counter = None
-    self.command_pointer = None
+    self.counter = None
+    self.pointer = None
     self.registers_usage = None
     self.sample = None
     self.step_complete = False
@@ -101,20 +46,23 @@ class VM:
     """ Override gene data in VM """
     self.gene = gene
 
-  def reset_scores(self) -> None:
-    """ Reset all scores for VM """
-    self.scores = {}
-
-  def reset(self) -> None:
-    """ Reset state for next sample calculation """
-    self.registers = [0. for _ in range(self.params.register_count)]
-    self.registers_usage = [0. for _ in range(self.params.register_count)]
-    self.heap = [0. for _ in range(max(self.params.heap_size, len(self.sample.output)))]
+  def reset_partial(self) -> None:
+    """ Reset state for next sample in dataset calculation """
+    self.registers = [0. for _ in range(self.register_count)]
+    self.registers_usage = [0. for _ in range(self.register_count)]
+    self.heap = [0. for _ in range(max(self.heap_size, len(self.sample.expected)))]
     self.stack = []
-    self.command_counter = 0
-    self.command_pointer = 0
+    self.counter = 0
+    self.pointer = 0
     self.step_complete = False
     self.sample_idx = 0
+
+  def reset_full(self) -> None:
+    """ Reset state for next dataset calculation """
+    self.sample = self.samples[0]
+    self.reset_partial()
+    for idx in range(len(self.scorers)):
+      self.scorers[idx].reset()
 
   def step(self, sample) -> bool:
     """
@@ -122,49 +70,51 @@ class VM:
     """
     # Prepare
     self.sample = sample
-    self.reset()
+    self.reset_partial()
 
     # Calc
     try:
       while True:
         # Early exit conditions (with zero len gene possibility)
-        if (self.command_pointer >= len(self.gene)) or self.command_pointer < 0:
+        if (self.pointer >= len(self.gene)) or self.pointer < 0:
           break
 
-        if self.command_counter >= self.params.tickLimit:
+        if self.counter >= self.tickLimit:
           break
 
         # Calculate gene
-        self.gene[self.command_pointer].calc(self)
+        self.gene[self.pointer].calc(self)
 
         # Update counters
-        self.command_counter += 1
-        self.command_pointer += 1
+        self.counter += 1
+        self.pointer += 1
 
     except Exception as exc:
-      if not exc.args[0] in self.params.exception_handlers:
+      if not exc.args[0] in self.exception_handlers:
         raise exc
       else:
-        self.params.exception_handlers[exc.args[0]](self)
+        self.exception_handlers[exc.args[0]](self)
 
     else:
       self.step_complete = True
 
     # Post calc
-    for scorer in self.params.scorers["step"]:
-      self.scores[scorer.__str__] = scorer.calc(self)
+    for scorer in self.scorers:
+      scorer.calc(self, end=False)
 
     # Return result
     return self.step_complete
 
   def calc(self) -> List[bool]:
-    """ Calculate all samples in VM """
+    """ Calculate all dataset in VM """
+    self.reset_full()
+
     result = []
     for idx, sample in enumerate(self.samples):
       self.sample_idx = idx
       result.append(self.step(sample))
 
-    for scorer in self.params.scorers["result"]:
-      self.scores[scorer.__str__] = scorer.calc(self)
+    for scorer in self.scorers:
+      scorer.calc(self, end=True)
 
     return result

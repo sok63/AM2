@@ -1,50 +1,21 @@
-from random import randint
-
+from AMLib.Core.Data import VMSample, VMDataset
 from AMLib.Core.Scorers.SimpleScorers import DistanceScorer
-from AMLib.Core.VM import VM, VMParams, VMSample, VMDataset
-
-
-class Dummy:
-  pass
+from AMLib.Core.VM import VM
 
 
 class TestDistanceScorer:
-  def test_dummy(self):
-    # Prepare
-    smpl = Dummy()
-    smpl.output = [1., 2., 3.]
-    d = Dummy()
-    d.sample = smpl
-    d.heap = [2., 3., 4]
-
-    # Act
-    result = -1. * sum([abs(smpl.output[x] - d.heap[x]) for x in range(len(smpl.output))])
-
-    # Assert
-    assert result == DistanceScorer.calc(d)
-
-  def test_VMSample_and_one_step(self):
-    # Prepare
-    vm = VM()
-    smpl = VMSample(input=[1., 2., 3.], output=[2., 3., 4])
-    vm.step(smpl)
-
-    # Act
-    result = -1. * sum([abs(smpl.output[x] - vm.heap[x]) for x in range(len(smpl.output))])
-
-    # Assert
-    assert result == DistanceScorer.calc(vm)
-
   def test_VMDataset_and_full_calc(self):
     # Prepare
     vm = VM()
-    smpl = VMSample(input=[1., 2., 3.], output=[2., 3., 4])
+    smpl = VMSample(initial=[1., 2., 3.], expected=[2., 3., 4])
     ds = VMDataset([smpl])
     vm.samples = ds
+    vm.scorers.append(DistanceScorer())
+
     vm.calc()
 
     # Act
-    result = -1. * sum([abs(vm.sample.output[x] - vm.heap[x]) for x in range(len(vm.sample.output))])
+    result = sum([abs(vm.sample.expected[x] - vm.heap[x]) for x in range(len(vm.sample.expected))])
 
     # Assert
-    assert result == DistanceScorer.calc(vm)
+    assert result == vm.scorers[0].get_result()
